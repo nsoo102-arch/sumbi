@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--sumbi-background);
+  color: var(--sumbi-text);
+  overflow-x: hidden;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+.sumbi-page {
+  @apply -my-6 flex min-h-[100dvh] flex-col justify-center py-12;
+}
+
+.sumbi-heading {
+  @apply mb-6 text-center text-[1.375rem] font-normal leading-relaxed tracking-[0.04em];
+}
+
+.sumbi-body {
+  @apply text-center text-[1.0625rem] font-light leading-[2] tracking-[0.04em];
+}
+
+.sumbi-input {
+  @apply w-full rounded-sumbi border border-sumbi-border bg-white px-4 py-3 font-light text-sumbi-text focus:outline-none focus:ring-1 focus:ring-sumbi-primary;
+}
+
+.sumbi-textarea {
+  @apply w-full min-h-[140px] resize-none rounded-sumbi border border-sumbi-border bg-white px-4 py-3 font-light leading-relaxed text-sumbi-text focus:outline-none focus:ring-1 focus:ring-sumbi-primary;
+}

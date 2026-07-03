@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="(D">
+  <rect width="512" height="512" rx="112" fill="#F8F6F1"/>
+  <rect x="18" y="18" width="476" height="476" rx="98" fill="none" stroke="#2E7D7A" stroke-width="14"/>
+  <text x="256" y="292" text-anchor="middle" font-family="serif" font-size="220" fill="#2E7D7A">(</text>
+</svg>
