@@ -9,11 +9,9 @@ import {
   saveDraftActivity,
   saveWeeklyActivities,
 } from "@/lib";
+import { syncWeeklyPlanAfterSave } from "@/lib/sheetSync";
 
 const ACTIVITY_COUNT = 5;
-
-const inputClassName =
-  "sumbi-input mx-auto h-14 w-full max-w-[360px] !py-0 px-4 text-left";
 
 function toInputFields(saved: string[]): string[] {
   const fields = Array(ACTIVITY_COUNT).fill("");
@@ -45,12 +43,13 @@ export default function TodayPage() {
     );
     saveWeeklyActivities(filled);
     saveDraftActivity(filled.join("\n"));
+    void syncWeeklyPlanAfterSave(filled);
     router.push("/record");
   }
 
   return (
     <section className="sumbi-page items-center">
-      <h1 className="sumbi-heading mb-4">이번 주 나의 숨비소리</h1>
+      <h1 className="sumbi-heading-tight">이번 주 나의 숨비소리</h1>
 
       <p className="sumbi-body mb-10">
         이번 주 나를 숨 쉬게 할
@@ -58,26 +57,21 @@ export default function TodayPage() {
         소소한 활동을 정해보세요.
       </p>
 
-      <div className="mb-14 flex w-full max-w-[360px] flex-col space-y-4">
+      <div className="sumbi-content mb-14 flex flex-col space-y-4">
         {activities.map((activity, index) => (
           <input
             key={index}
             type="text"
-            aria-label={`활동 ${index + 1}`}
+            aria-label={`숨비활동 ${index + 1}`}
             value={activity}
             onChange={(event) => updateActivity(index, event.target.value)}
-            className={inputClassName}
+            className="sumbi-input-tall"
           />
         ))}
       </div>
 
       <div className="flex justify-center">
-        <Button
-          className="px-12 py-3.5 text-[0.9375rem] font-normal tracking-wide"
-          onClick={handleSubmit}
-        >
-          다음
-        </Button>
+        <Button onClick={handleSubmit}>다음</Button>
       </div>
     </section>
   );

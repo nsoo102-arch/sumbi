@@ -1,11 +1,18 @@
 import type { HTMLAttributes } from "react";
 
-type CardProps = HTMLAttributes<HTMLDivElement>;
+type CardProps = HTMLAttributes<HTMLDivElement> & {
+  compact?: boolean;
+};
 
-export function Card({ className = "", children, ...props }: CardProps) {
+export function Card({
+  className = "",
+  children,
+  compact = false,
+  ...props
+}: CardProps) {
   return (
     <div
-      className={`rounded-sumbi border border-sumbi-border bg-white p-6 ${className}`}
+      className={`${compact ? "sumbi-card-compact" : "sumbi-card"} ${className}`.trim()}
       {...props}
     >
       {children}

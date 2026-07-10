@@ -5,6 +5,7 @@ export type SumbiProfile = {
 
 export type SumbiRecord = {
   id: string;
+  userId: string;
   activity: string;
   reflection: string;
   checkedActivities: string[];

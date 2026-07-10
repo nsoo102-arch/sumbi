@@ -9,6 +9,7 @@ export type FootprintsSummary = {
 function normalizeRecord(record: SumbiRecord): SumbiRecord {
   return {
     ...record,
+    userId: record.userId ?? "",
     checkedActivities: normalizeActivities(record.checkedActivities ?? []),
   };
 }

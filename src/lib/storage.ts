@@ -1,8 +1,12 @@
 import type { SumbiData, SumbiProfile, SumbiRecord } from "@/types/sumbi";
+import { getSession } from "./auth";
 import { normalizeActivities } from "./activities";
+import { createId } from "./id";
 import { getWeekKey, isCurrentWeek } from "./week";
 
-const STORAGE_KEY = "sumbi";
+function getUserDataKey(userId: string): string {
+  return `sumbi-user-${userId}`;
+}
 
 function defaultDraft(): SumbiData["draft"] {
   return { activity: "", reflection: "", checkedActivities: [] };
@@ -31,6 +35,7 @@ function normalizeRecord(record: SumbiRecord): SumbiRecord {
   return {
     ...record,
     checkedActivities: normalizeActivities(record.checkedActivities ?? []),
+    userId: record.userId,
   };
 }
 
@@ -56,31 +61,47 @@ function migrateWeeklyActivities(parsed: SumbiData & { activities?: string[] }) 
   return null;
 }
 
+function parseUserData(raw: string): SumbiData {
+  const parsed = JSON.parse(raw) as SumbiData & { activities?: string[] };
+  return {
+    profile: parsed.profile ?? null,
+    weeklyActivities: migrateWeeklyActivities(parsed),
+    records: (parsed.records ?? []).map(normalizeRecord),
+    draft: normalizeDraft(parsed.draft),
+  };
+}
+
+function getCurrentUserId(): string | null {
+  return getSession()?.userId ?? null;
+}
+
 export function loadSumbi(): SumbiData {
   if (typeof window === "undefined") {
     return defaultData();
   }
 
+  const userId = getCurrentUserId();
+  if (!userId) {
+    return defaultData();
+  }
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getUserDataKey(userId));
     if (!raw) {
       return defaultData();
     }
-
-    const parsed = JSON.parse(raw) as SumbiData & { activities?: string[] };
-    return {
-      profile: parsed.profile ?? null,
-      weeklyActivities: migrateWeeklyActivities(parsed),
-      records: (parsed.records ?? []).map(normalizeRecord),
-      draft: normalizeDraft(parsed.draft),
-    };
+    return parseUserData(raw);
   } catch {
     return defaultData();
   }
 }
 
 export function saveSumbi(data: SumbiData): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const userId = getCurrentUserId();
+  if (!userId) {
+    return;
+  }
+  localStorage.setItem(getUserDataKey(userId), JSON.stringify(data));
 }
 
 export function getWeeklyActivities(): string[] {
@@ -124,13 +145,23 @@ export function saveDraftCheckedActivities(checkedActivities: string[]): void {
   saveSumbi(data);
 }
 
-export function commitRecord(): SumbiRecord {
+export function commitRecord(options?: {
+  checkedActivities?: string[];
+  reflection?: string;
+}): SumbiRecord {
   const data = loadSumbi();
+  const userId = getCurrentUserId();
+  const checkedActivities = normalizeActivities(
+    options?.checkedActivities ?? data.draft.checkedActivities,
+  );
+  const reflection = options?.reflection ?? data.draft.reflection;
+
   const record: SumbiRecord = {
-    id: crypto.randomUUID(),
+    id: createId(),
+    userId: userId ?? "",
     activity: data.draft.activity,
-    reflection: data.draft.reflection,
-    checkedActivities: normalizeActivities(data.draft.checkedActivities),
+    reflection,
+    checkedActivities,
     savedAt: new Date().toISOString(),
   };
 
@@ -139,4 +170,12 @@ export function commitRecord(): SumbiRecord {
   saveSumbi(data);
 
   return record;
+}
+
+export function initializeUserProfile(name: string): void {
+  const data = loadSumbi();
+  if (!data.profile) {
+    data.profile = { name, note: "" };
+    saveSumbi(data);
+  }
 }

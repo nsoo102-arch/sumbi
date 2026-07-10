@@ -4,6 +4,13 @@
   --sumbi-text: #222222;
   --sumbi-border: #d9d9d9;
   --sumbi-radius: 24px;
+  --sumbi-error: #8b4a4a;
+  --sumbi-muted: #888888;
+  --sumbi-surface: #fcfbf8;
+  --sumbi-admin-radius: 16px;
+  --sumbi-content-width: 360px;
+  --sumbi-admin-width: 720px;
+  --sumbi-admin-width-wide: 960px;
 }
 
 @theme inline {
@@ -11,5 +18,9 @@
   --color-sumbi-primary: var(--sumbi-primary);
   --color-sumbi-text: var(--sumbi-text);
   --color-sumbi-border: var(--sumbi-border);
+  --color-sumbi-error: var(--sumbi-error);
+  --color-sumbi-muted: var(--sumbi-muted);
+  --color-sumbi-surface: var(--sumbi-surface);
   --radius-sumbi: var(--sumbi-radius);
+  --radius-sumbi-admin: var(--sumbi-admin-radius);
 }

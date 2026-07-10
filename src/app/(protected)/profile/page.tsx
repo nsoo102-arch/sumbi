@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components";
+import { getSession } from "@/lib/auth";
 import { loadSumbi, saveProfile } from "@/lib";
 
 export default function ProfilePage() {
@@ -13,6 +14,12 @@ export default function ProfilePage() {
     const data = loadSumbi();
     if (data.profile?.name) {
       setName(data.profile.name);
+      return;
+    }
+
+    const session = getSession();
+    if (session?.nickname) {
+      setName(session.nickname);
     }
   }, []);
   function handleSubmit() {
@@ -31,7 +38,7 @@ export default function ProfilePage() {
 
   return (
     <section className="sumbi-page items-center">
-      <h1 className="sumbi-heading mb-4">활동이름</h1>
+      <h1 className="sumbi-heading-tight">활동이름</h1>
       <p className="sumbi-body mb-10">
         숨비소리에서
         <br />
@@ -44,15 +51,11 @@ export default function ProfilePage() {
         aria-label="활동이름"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="sumbi-input mx-auto mb-14 h-14 w-full max-w-[360px] !py-0 px-4 text-left"
+        className="sumbi-input-tall sumbi-content mb-14"
       />
 
       <div className="flex justify-center">
-        <Button
-          className="px-12 py-3.5 text-[0.9375rem] font-normal tracking-wide"
-          onClick={handleSubmit}
-          disabled={!name.trim()}
-        >
+        <Button onClick={handleSubmit} disabled={!name.trim()}>
           다음
         </Button>
       </div>
