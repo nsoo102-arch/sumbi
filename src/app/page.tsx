@@ -1,4 +1,4 @@
-import { DevResetTestDataButton, StartButton } from "@/components";
+import { StartButton } from "@/components";
 
 export default function HomePage() {
   return (
@@ -15,11 +15,6 @@ export default function HomePage() {
       </div>
 
       <StartButton />
-
-      <DevResetTestDataButton
-        redirectTo="/login/signup"
-        className="mt-4"
-      />
     </section>
   );
 }
