@@ -1,4 +1,8 @@
 import type { AuthSession, AuthUser } from "@/types/auth";
+import {
+  isGoogleSheetSyncEnabled,
+  postAppsScriptAuth,
+} from "./googleSheetSync";
 
 const USERS_KEY = "sumbi-auth-users";
 const SESSION_KEY = "sumbi-session";
@@ -28,6 +32,20 @@ function loadUsers(): AuthUser[] {
 
 function saveUsers(users: AuthUser[]): void {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+/** 원격 로그인/가입 성공 시 이 기기 localStorage에도 캐시 (오프라인·빠른 재로그인) */
+function upsertLocalUser(user: AuthUser): void {
+  const users = loadUsers();
+  const index = users.findIndex((entry) => entry.email === user.email);
+  if (index === -1) {
+    saveUsers([...users, user]);
+    return;
+  }
+
+  const next = [...users];
+  next[index] = normalizeUser(user);
+  saveUsers(next);
 }
 
 function createId(): string {
@@ -200,6 +218,15 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function toSession(user: Pick<AuthUser, "id" | "email" | "name" | "nickname">): AuthSession {
+  return {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    nickname: user.nickname,
+  };
+}
+
 export function getSession(): AuthSession | null {
   if (typeof window === "undefined") {
     return null;
@@ -231,6 +258,74 @@ export function setSession(session: AuthSession): void {
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
+}
+
+async function signUpLocal(
+  name: string,
+  nickname: string,
+  email: string,
+  password: string,
+): Promise<
+  | { ok: true; user: AuthUser; session: AuthSession }
+  | { ok: false; error: string }
+> {
+  const users = loadUsers();
+  if (users.some((user) => user.email === email)) {
+    return { ok: false, error: "이미 가입된 이메일입니다." };
+  }
+
+  const newUser: AuthUser = {
+    id: createId(),
+    name,
+    nickname,
+    email,
+    passwordHash: await hashPassword(password),
+  };
+
+  saveUsers([...users, newUser]);
+  const session = toSession(newUser);
+  setSession(session);
+  return { ok: true, user: newUser, session };
+}
+
+async function signInLocal(
+  email: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const users = loadUsers();
+  const user = users.find((entry) => entry.email === email);
+
+  if (!user) {
+    return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
+  }
+
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
+  }
+
+  setSession(toSession(user));
+  return { ok: true };
+}
+
+async function resetPasswordLocal(
+  email: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const users = loadUsers();
+  const index = users.findIndex((user) => user.email === email);
+
+  if (index === -1) {
+    return { ok: false, error: "등록되지 않은 이메일입니다." };
+  }
+
+  const next = [...users];
+  next[index] = {
+    ...next[index],
+    passwordHash: await hashPassword(password),
+  };
+  saveUsers(next);
+  return { ok: true };
 }
 
 export async function signUp(
@@ -267,29 +362,43 @@ export async function signUp(
       return { ok: false, error: "비밀번호는 6자 이상이어야 합니다." };
     }
 
-    const users = loadUsers();
-    if (users.some((user) => user.email === normalizedEmail)) {
-      return { ok: false, error: "이미 가입된 이메일입니다." };
+    // Apps Script URL이 있으면 시트를 기준으로 가입 (기기 간 공유)
+    if (isGoogleSheetSyncEnabled()) {
+      const passwordHash = await hashPassword(password);
+      const userId = createId();
+      const remote = await postAppsScriptAuth("signup", {
+        created_at: new Date().toISOString(),
+        user_id: userId,
+        name: trimmedName,
+        nickname: trimmedNickname,
+        email: normalizedEmail,
+        password_hash: passwordHash,
+      });
+
+      if (!remote.ok) {
+        return { ok: false, error: remote.error };
+      }
+
+      const newUser: AuthUser = {
+        id: remote.data.user_id || userId,
+        name: remote.data.name || trimmedName,
+        nickname: remote.data.nickname || trimmedNickname,
+        email: normalizeEmail(remote.data.email || normalizedEmail),
+        passwordHash,
+      };
+
+      upsertLocalUser(newUser);
+      const session = toSession(newUser);
+      setSession(session);
+      return { ok: true, user: newUser, session };
     }
 
-    const newUser: AuthUser = {
-      id: createId(),
-      name: trimmedName,
-      nickname: trimmedNickname,
-      email: normalizedEmail,
-      passwordHash: await hashPassword(password),
-    };
-
-    saveUsers([...users, newUser]);
-    const session: AuthSession = {
-      userId: newUser.id,
-      email: newUser.email,
-      name: newUser.name,
-      nickname: newUser.nickname,
-    };
-    setSession(session);
-
-    return { ok: true, user: newUser, session };
+    return signUpLocal(
+      trimmedName,
+      trimmedNickname,
+      normalizedEmail,
+      password,
+    );
   } catch {
     return { ok: false, error: "회원가입 처리 중 오류가 발생했습니다." };
   }
@@ -299,33 +408,85 @@ export async function signIn(
   email: string,
   password: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof window === "undefined") {
+    return { ok: false, error: "브라우저에서만 로그인할 수 있습니다." };
+  }
+
   const normalizedEmail = normalizeEmail(email);
-  const users = loadUsers();
-  const user = users.find((entry) => entry.email === normalizedEmail);
 
-  if (!user) {
-    return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
+  if (!normalizedEmail) {
+    return { ok: false, error: "이메일을 입력해 주세요." };
   }
 
-  const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) {
-    return { ok: false, error: "이메일 또는 비밀번호가 올바르지 않습니다." };
+  if (!password) {
+    return { ok: false, error: "비밀번호를 입력해 주세요." };
   }
 
-  setSession({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    nickname: user.nickname,
-  });
+  // Apps Script URL이 있으면 원격 검증 우선 (다른 기기에서도 로그인)
+  if (isGoogleSheetSyncEnabled()) {
+    const remote = await postAppsScriptAuth("login", {
+      email: normalizedEmail,
+      password,
+    });
 
-  return { ok: true };
+    if (remote.ok) {
+      const passwordHash = await hashPassword(password);
+      const user: AuthUser = {
+        id: remote.data.user_id,
+        name: remote.data.name,
+        nickname: remote.data.nickname || remote.data.name,
+        email: normalizeEmail(remote.data.email),
+        passwordHash,
+      };
+      upsertLocalUser(user);
+      setSession(toSession(user));
+      return { ok: true };
+    }
+
+    // 네트워크/배포 오류가 아니라 인증 실패면 로컬로 우회하지 않음
+    const authFailure =
+      remote.error.includes("비밀번호") ||
+      remote.error.includes("이메일") ||
+      remote.error.includes("등록되지") ||
+      remote.error.includes("올바르지");
+
+    if (authFailure) {
+      return { ok: false, error: remote.error };
+    }
+
+    // 배포본에 login API가 아직 없으면 명확히 안내
+    if (
+      remote.error.includes("Unknown") ||
+      remote.error.includes("HTML") ||
+      remote.error.includes("배포")
+    ) {
+      return {
+        ok: false,
+        error:
+          "원격 로그인을 사용할 수 없습니다. Apps Script를 새 버전으로 재배포해 주세요.",
+      };
+    }
+
+    // Apps Script 일시 장애 시에만 이 기기 localStorage로 폴백
+    const local = await signInLocal(normalizedEmail, password);
+    if (local.ok) {
+      return local;
+    }
+
+    return { ok: false, error: remote.error };
+  }
+
+  return signInLocal(normalizedEmail, password);
 }
 
 export async function resetPassword(
   email: string,
   password: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof window === "undefined") {
+    return { ok: false, error: "브라우저에서만 변경할 수 있습니다." };
+  }
+
   const normalizedEmail = normalizeEmail(email);
 
   if (!normalizedEmail) {
@@ -336,18 +497,42 @@ export async function resetPassword(
     return { ok: false, error: "비밀번호는 6자 이상이어야 합니다." };
   }
 
-  const users = loadUsers();
-  const index = users.findIndex((user) => user.email === normalizedEmail);
+  const passwordHash = await hashPassword(password);
 
-  if (index === -1) {
-    return { ok: false, error: "등록되지 않은 이메일입니다." };
+  if (isGoogleSheetSyncEnabled()) {
+    const remote = await postAppsScriptAuth("reset_password", {
+      email: normalizedEmail,
+      password_hash: passwordHash,
+    });
+
+    if (!remote.ok) {
+      return { ok: false, error: remote.error };
+    }
+
+    const users = loadUsers();
+    const index = users.findIndex((user) => user.email === normalizedEmail);
+    if (index === -1) {
+      upsertLocalUser({
+        id: remote.data.user_id,
+        name: remote.data.name,
+        nickname: remote.data.nickname || remote.data.name,
+        email: normalizeEmail(remote.data.email),
+        passwordHash,
+      });
+    } else {
+      const next = [...users];
+      next[index] = {
+        ...next[index],
+        passwordHash,
+        name: remote.data.name || next[index].name,
+        nickname: remote.data.nickname || next[index].nickname,
+        id: remote.data.user_id || next[index].id,
+      };
+      saveUsers(next);
+    }
+
+    return { ok: true };
   }
 
-  users[index] = {
-    ...users[index],
-    passwordHash: await hashPassword(password),
-  };
-  saveUsers(users);
-
-  return { ok: true };
+  return resetPasswordLocal(normalizedEmail, password);
 }

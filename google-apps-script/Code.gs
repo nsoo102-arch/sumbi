@@ -9,8 +9,16 @@
  * 시트 탭: users, weekly_plan, daily_record, letters, AdminNotes
  *
  * users 컬럼 (현재 시트 헤더):
- * A created_at | B user_id | C name | D nickname | E email
+ * A created_at | B user_id | C name | D nickname | E email | F password_hash
  * 저장/조회는 헤더명 기준 매핑 (열 순서가 바뀌어도 안전)
+ * password_hash: salt:sha256(salt:password) — list_users/get_member 응답에는 포함하지 않음
+ * 기존 시트 전용 회원(해시 없음)은 login 시 비밀번호를 등록하거나, signup으로 해시를 붙일 수 있음
+ *
+ * 인증 API (doPost type):
+ * - signup: 이메일 중복 검사 후 회원+비밀번호 해시 저장 (해시 없는 기존 행은 업그레이드)
+ * - login: 이메일/비밀번호 검증 후 프로필 반환 (해시 미포함, 해시 없으면 첫 로그인 시 등록)
+ * - reset_password: 이메일로 비밀번호 해시 갱신
+ * - user: 하위 호환 upsert (password_hash 있으면 저장, 없으면 기존 해시 유지)
  *
  * weekly_plan 컬럼:
  * A created_at | B user_id | C name | D nickname | E email | F week_start_date
@@ -119,19 +127,22 @@ function isHeaderRow(row, keys) {
 }
 
 function buildUsersColumnMap(headerRow) {
-  // 기본값: 현재 Users 시트 헤더 순서
-  // created_at | user_id | name | nickname | email
+  // 기본값: Users 시트 헤더 순서
+  // created_at | user_id | name | nickname | email | password_hash
   var map = {
     created_at: 0,
     user_id: 1,
     name: 2,
     nickname: 3,
     email: 4,
+    password_hash: 5,
   };
 
   if (!headerRow) {
     return map;
   }
+
+  var foundPasswordHash = false;
 
   headerRow.forEach(function (cell, index) {
     var key = cellToString(cell).toLowerCase();
@@ -154,10 +165,68 @@ function buildUsersColumnMap(headerRow) {
       key === "가입일시"
     ) {
       map.created_at = index;
+    } else if (
+      key === "password_hash" ||
+      key === "passwordhash" ||
+      key === "비밀번호해시"
+    ) {
+      map.password_hash = index;
+      foundPasswordHash = true;
     }
   });
 
+  if (!foundPasswordHash) {
+    map.password_hash = -1;
+  }
+
   return map;
+}
+
+/** 빈 users 시트에 표준 헤더를 만들고, password_hash 열이 없으면 추가합니다. */
+function ensurePasswordHashColumn(meta) {
+  if (meta.error) {
+    return meta;
+  }
+
+  var sheet = meta.sheet;
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      "created_at",
+      "user_id",
+      "name",
+      "nickname",
+      "email",
+      "password_hash",
+    ]);
+    meta.hasHeader = true;
+    meta.columnMap = buildUsersColumnMap(
+      sheet.getRange(1, 1, 1, 6).getValues()[0],
+    );
+    meta.lastCol = 6;
+    return meta;
+  }
+
+  var columnMap = meta.columnMap;
+  if (
+    typeof columnMap.password_hash === "number" &&
+    columnMap.password_hash >= 0
+  ) {
+    meta.lastCol = Math.max(meta.lastCol, columnMap.password_hash + 1);
+    return meta;
+  }
+
+  var newColIndex = meta.lastCol;
+  columnMap.password_hash = newColIndex;
+  meta.lastCol = newColIndex + 1;
+
+  if (meta.hasHeader) {
+    sheet.getRange(1, newColIndex + 1).setValue("password_hash");
+  }
+
+  sheet.getRange(1, newColIndex + 1).setNumberFormat("@");
+
+  return meta;
 }
 
 function getUsersSheetAndMap() {
@@ -183,6 +252,7 @@ function getUsersSheetAndMap() {
         "이름",
         "이메일",
         "가입일",
+        "password_hash",
       ])
     ) {
       headerRow = firstRow;
@@ -191,55 +261,430 @@ function getUsersSheetAndMap() {
     }
   }
 
-  return {
+  return ensurePasswordHashColumn({
     sheet: sheet,
     columnMap: columnMap,
     lastCol: lastCol,
     hasHeader: !!headerRow,
+  });
+}
+
+/** 클라이언트와 동일한 SHA-256 hex (salt:password → hash) */
+function sha256HexAppsScript(message) {
+  var raw = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    message,
+    Utilities.Charset.UTF_8,
+  );
+  var out = [];
+  for (var i = 0; i < raw.length; i++) {
+    var value = raw[i];
+    if (value < 0) {
+      value += 256;
+    }
+    var hex = value.toString(16);
+    out.push(hex.length === 1 ? "0" + hex : hex);
+  }
+  return out.join("");
+}
+
+/** salt:sha256(salt:password) — 클라이언트 hashPassword와 동일 형식 */
+function hashPasswordAppsScript(password) {
+  var salt = Utilities.getUuid();
+  var hash = sha256HexAppsScript(salt + ":" + String(password));
+  return salt + ":" + hash;
+}
+
+/** Sheets가 날짜/숫자로 변환하지 않도록 텍스트로 읽기 */
+function readPasswordHashCell(value) {
+  var stored = cellToString(value);
+  if (stored.charAt(0) === "'") {
+    stored = stored.slice(1);
+  }
+  return stored;
+}
+
+function isValidPasswordHash(storedHash) {
+  var stored = readPasswordHashCell(storedHash);
+  var separator = stored.indexOf(":");
+  if (separator <= 0) {
+    return false;
+  }
+  var salt = stored.slice(0, separator);
+  var hash = stored.slice(separator + 1);
+  // sha256 hex = 64자. Sheets가 날짜로 바꾼 값은 여기서 걸러집니다.
+  if (!salt || !/^[0-9a-f]{64}$/i.test(hash)) {
+    return false;
+  }
+  return true;
+}
+
+function verifyPasswordHash(password, storedHash) {
+  var stored = readPasswordHashCell(storedHash);
+  var separator = stored.indexOf(":");
+  if (separator <= 0) {
+    return false;
+  }
+
+  var salt = stored.slice(0, separator);
+  var expectedHash = stored.slice(separator + 1);
+  if (!expectedHash) {
+    return false;
+  }
+
+  var hash = sha256HexAppsScript(salt + ":" + String(password));
+  return hash === expectedHash;
+}
+
+/** password_hash 셀을 강제 텍스트로 저장 (Sheets 자동 변환 방지) */
+function writePasswordHashCell(sheet, rowIndex, columnIndex0, passwordHash) {
+  if (columnIndex0 < 0) {
+    return;
+  }
+  var cell = sheet.getRange(rowIndex, columnIndex0 + 1);
+  cell.setNumberFormat("@");
+  cell.setValue(cellToString(passwordHash));
+}
+
+function publicUserProfile(user) {
+  return {
+    created_at: user.created_at || "",
+    user_id: user.user_id || "",
+    name: user.name || "",
+    nickname: user.nickname || "",
+    email: user.email || "",
+    status: "active",
   };
 }
 
-/** 헤더명 기준으로 Users 시트에 회원 행을 추가합니다. */
-function appendUserByHeader(payload) {
+/**
+ * 이메일로 회원 행을 찾습니다.
+ * includePasswordHash=true 일 때만 password_hash를 포함합니다 (login/reset 전용).
+ */
+function findUserRowByEmail(email, includePasswordHash) {
   var meta = getUsersSheetAndMap();
   if (meta.error) {
-    return { success: false, error: meta.error };
+    return { error: meta.error };
+  }
+
+  var normalized = normalizeEmail(email);
+  if (!normalized) {
+    return { error: "이메일을 입력해 주세요." };
   }
 
   var sheet = meta.sheet;
   var columnMap = meta.columnMap;
-  var lastCol = meta.lastCol;
+  var values = sheet.getDataRange().getValues();
+  if (!values || values.length === 0) {
+    return { found: false, meta: meta };
+  }
 
+  var startIndex = meta.hasHeader ? 1 : 0;
+
+  for (var i = startIndex; i < values.length; i++) {
+    var row = values[i];
+    var rowEmail = normalizeEmail(row[columnMap.email]);
+    if (rowEmail !== normalized) {
+      continue;
+    }
+
+    var user = {
+      created_at: cellToString(row[columnMap.created_at]),
+      user_id: cellToString(row[columnMap.user_id]),
+      name: cellToString(row[columnMap.name]),
+      nickname: cellToString(row[columnMap.nickname]),
+      email: rowEmail,
+      status: "active",
+    };
+
+    if (includePasswordHash) {
+      user.password_hash = readPasswordHashCell(row[columnMap.password_hash]);
+    }
+
+    return {
+      found: true,
+      rowIndex: i + 1,
+      user: user,
+      meta: meta,
+    };
+  }
+
+  return { found: false, meta: meta };
+}
+
+function writeUserRow(meta, rowIndex, user, passwordHash) {
+  var sheet = meta.sheet;
+  var columnMap = meta.columnMap;
+  var lastCol = meta.lastCol;
+  var row = [];
+  var existingHash = "";
+  var hasHashColumn =
+    typeof columnMap.password_hash === "number" &&
+    columnMap.password_hash >= 0;
+  // 빈 문자열은 "미전달"로 취급해 기존 해시를 지우지 않음
+  var shouldWriteHash =
+    hasHashColumn &&
+    passwordHash !== undefined &&
+    passwordHash !== null &&
+    cellToString(passwordHash) !== "";
+
+  if (rowIndex && rowIndex > 0) {
+    var existing = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+    for (var c = 0; c < lastCol; c++) {
+      row[c] = existing[c];
+    }
+    if (hasHashColumn) {
+      existingHash = readPasswordHashCell(existing[columnMap.password_hash]);
+    }
+  } else {
+    for (var i = 0; i < lastCol; i++) {
+      row[i] = "";
+    }
+  }
+
+  row[columnMap.created_at] = user.created_at;
+  row[columnMap.user_id] = user.user_id;
+  row[columnMap.name] = user.name;
+  row[columnMap.nickname] = user.nickname;
+  row[columnMap.email] = user.email;
+
+  // setValues로 넣으면 Sheets가 salt:hash를 날짜/숫자로 바꿀 수 있어
+  // 프로필만 먼저 쓰고, password_hash는 텍스트 포맷으로 따로 저장합니다.
+  if (hasHashColumn) {
+    row[columnMap.password_hash] = existingHash || "";
+  }
+
+  var targetRowIndex = rowIndex;
+  if (rowIndex && rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, lastCol).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+    targetRowIndex = sheet.getLastRow();
+  }
+
+  if (shouldWriteHash) {
+    writePasswordHashCell(
+      sheet,
+      targetRowIndex,
+      columnMap.password_hash,
+      passwordHash,
+    );
+  } else if (hasHashColumn && existingHash) {
+    writePasswordHashCell(
+      sheet,
+      targetRowIndex,
+      columnMap.password_hash,
+      existingHash,
+    );
+  }
+}
+
+/** 회원가입: 이메일 중복 검사 후 password_hash와 함께 저장 */
+function signupUser(payload) {
   var created_at =
     cellToString(payload.created_at) || new Date().toISOString();
   var user_id = cellToString(payload.user_id || payload.userId || payload.id);
   var name = cellToString(payload.name);
   var nickname = cellToString(payload.nickname);
   var email = normalizeEmail(payload.email);
+  var password_hash = cellToString(
+    payload.password_hash || payload.passwordHash,
+  );
 
-  var row = [];
-  for (var c = 0; c < lastCol; c++) {
-    row[c] = "";
+  if (!name) {
+    return { success: false, error: "이름을 입력해 주세요." };
+  }
+  if (!nickname) {
+    return { success: false, error: "닉네임을 입력해 주세요." };
+  }
+  if (!email) {
+    return { success: false, error: "이메일을 입력해 주세요." };
+  }
+  if (!isValidPasswordHash(password_hash)) {
+    return { success: false, error: "비밀번호 해시가 올바르지 않습니다." };
+  }
+  if (!user_id) {
+    user_id = Utilities.getUuid();
   }
 
-  row[columnMap.created_at] = created_at;
-  row[columnMap.user_id] = user_id;
-  row[columnMap.name] = name;
-  row[columnMap.nickname] = nickname;
-  row[columnMap.email] = email;
+  var existing = findUserRowByEmail(email, true);
+  if (existing.error) {
+    return { success: false, error: existing.error };
+  }
 
-  sheet.appendRow(row);
+  // 예전에 프로필만 저장된 회원 → 비밀번호를 붙여 기기 간 로그인 가능하게 함
+  if (existing.found) {
+    if (isValidPasswordHash(existing.user.password_hash)) {
+      return { success: false, error: "이미 가입된 이메일입니다." };
+    }
+
+    var upgraded = {
+      created_at: existing.user.created_at || created_at,
+      user_id: existing.user.user_id || user_id,
+      name: name || existing.user.name,
+      nickname: nickname || existing.user.nickname,
+      email: email,
+    };
+    writeUserRow(existing.meta, existing.rowIndex, upgraded, password_hash);
+    return {
+      success: true,
+      data: publicUserProfile(upgraded),
+    };
+  }
+
+  var meta = existing.meta;
+  var user = {
+    created_at: created_at,
+    user_id: user_id,
+    name: name,
+    nickname: nickname,
+    email: email,
+  };
+  writeUserRow(meta, 0, user, password_hash);
 
   return {
     success: true,
-    data: {
-      created_at: created_at,
-      user_id: user_id,
-      name: name,
-      nickname: nickname,
-      email: email,
-      status: "active",
-    },
+    data: publicUserProfile(user),
+  };
+}
+
+/** 로그인: 시트에 저장된 password_hash로 검증 */
+function loginUser(payload) {
+  var email = normalizeEmail(payload.email);
+  var password = String(payload.password || "");
+
+  if (!email) {
+    return { success: false, error: "이메일을 입력해 주세요." };
+  }
+  if (!password) {
+    return { success: false, error: "비밀번호를 입력해 주세요." };
+  }
+
+  var found = findUserRowByEmail(email, true);
+  if (found.error) {
+    return { success: false, error: found.error };
+  }
+  if (!found.found) {
+    return {
+      success: false,
+      error: "이메일 또는 비밀번호가 올바르지 않습니다.",
+    };
+  }
+
+  var user = found.user;
+
+  // 시트에 비밀번호가 없던 기존 회원: 첫 원격 로그인 시 해시 등록 (기기 간 로그인 마이그레이션)
+  if (!isValidPasswordHash(user.password_hash)) {
+    var migratedHash = hashPasswordAppsScript(password);
+    writeUserRow(found.meta, found.rowIndex, user, migratedHash);
+    return {
+      success: true,
+      data: publicUserProfile(user),
+    };
+  }
+
+  if (!verifyPasswordHash(password, user.password_hash)) {
+    return {
+      success: false,
+      error: "이메일 또는 비밀번호가 올바르지 않습니다.",
+    };
+  }
+
+  return {
+    success: true,
+    data: publicUserProfile(user),
+  };
+}
+
+/** 비밀번호 재설정: 이메일로 password_hash 갱신 */
+function resetPasswordUser(payload) {
+  var email = normalizeEmail(payload.email);
+  var password_hash = cellToString(
+    payload.password_hash || payload.passwordHash,
+  );
+
+  if (!email) {
+    return { success: false, error: "이메일을 입력해 주세요." };
+  }
+  if (!isValidPasswordHash(password_hash)) {
+    return { success: false, error: "비밀번호 해시가 올바르지 않습니다." };
+  }
+
+  var found = findUserRowByEmail(email, true);
+  if (found.error) {
+    return { success: false, error: found.error };
+  }
+  if (!found.found) {
+    return { success: false, error: "등록되지 않은 이메일입니다." };
+  }
+
+  var user = found.user;
+  writeUserRow(found.meta, found.rowIndex, user, password_hash);
+
+  return {
+    success: true,
+    data: publicUserProfile(user),
+  };
+}
+
+/**
+ * 헤더명 기준으로 Users 시트에 회원을 추가/갱신합니다.
+ * 이메일이 있으면 프로필 업데이트(password_hash는 전달된 경우만 갱신).
+ */
+function appendUserByHeader(payload) {
+  var email = normalizeEmail(payload.email);
+  var created_at =
+    cellToString(payload.created_at) || new Date().toISOString();
+  var user_id = cellToString(payload.user_id || payload.userId || payload.id);
+  var name = cellToString(payload.name);
+  var nickname = cellToString(payload.nickname);
+  var password_hash = cellToString(
+    payload.password_hash || payload.passwordHash,
+  );
+
+  var existing = findUserRowByEmail(email, true);
+  if (existing.error) {
+    return { success: false, error: existing.error };
+  }
+
+  var meta = existing.meta;
+
+  if (existing.found) {
+    var current = existing.user;
+    var updated = {
+      created_at: current.created_at || created_at,
+      user_id: user_id || current.user_id,
+      name: name || current.name,
+      nickname: nickname || current.nickname,
+      email: email || current.email,
+    };
+    // password_hash가 요청에 있을 때만 갱신 (없으면 기존 해시 유지)
+    var nextHash = isValidPasswordHash(password_hash)
+      ? password_hash
+      : undefined;
+    writeUserRow(meta, existing.rowIndex, updated, nextHash);
+    return {
+      success: true,
+      data: publicUserProfile(updated),
+    };
+  }
+
+  if (!user_id) {
+    user_id = Utilities.getUuid();
+  }
+
+  var user = {
+    created_at: created_at,
+    user_id: user_id,
+    name: name,
+    nickname: nickname,
+    email: email,
+  };
+  writeUserRow(meta, 0, user, password_hash);
+
+  return {
+    success: true,
+    data: publicUserProfile(user),
   };
 }
 
@@ -1919,6 +2364,39 @@ function doPost(e) {
     const body = JSON.parse(e.postData.contents);
     const type = body.type;
     const payload = body.payload || {};
+
+    if (type === "signup") {
+      var signupResult = signupUser(payload);
+      if (!signupResult.success) {
+        return jsonResponse({
+          success: false,
+          error: signupResult.error || "회원가입에 실패했습니다.",
+        });
+      }
+      return jsonResponse({ success: true, data: signupResult.data });
+    }
+
+    if (type === "login") {
+      var loginResult = loginUser(payload);
+      if (!loginResult.success) {
+        return jsonResponse({
+          success: false,
+          error: loginResult.error || "로그인에 실패했습니다.",
+        });
+      }
+      return jsonResponse({ success: true, data: loginResult.data });
+    }
+
+    if (type === "reset_password") {
+      var resetResult = resetPasswordUser(payload);
+      if (!resetResult.success) {
+        return jsonResponse({
+          success: false,
+          error: resetResult.error || "비밀번호 변경에 실패했습니다.",
+        });
+      }
+      return jsonResponse({ success: true, data: resetResult.data });
+    }
 
     if (type === "list_users") {
       return listUsers();

@@ -5,10 +5,6 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Button, Card } from "@/components";
 import { signUp } from "@/lib/auth";
-import {
-  syncToGoogleSheet,
-  type GoogleSheetUserPayload,
-} from "@/lib/googleSheetSync";
 import { initializeUserProfile } from "@/lib/storage";
 import { syncMemberAfterSignup } from "@/lib/sheetSync";
 
@@ -40,7 +36,7 @@ export default function SignupPage() {
     }
 
     try {
-      // 1. user 객체 생성 + 2. localStorage에 user 저장 (signUp 내부)
+      // Apps Script URL이 있으면 시트에 password_hash 포함 가입 → 다른 기기 로그인 가능
       const signupResult = await signUp(name, nickname, email, password);
 
       if (!signupResult.ok) {
@@ -48,34 +44,19 @@ export default function SignupPage() {
         return;
       }
 
-      const { user, session } = signupResult;
+      const { session } = signupResult;
 
       initializeUserProfile(nickname.trim());
 
-      // 시트/Apps Script 동기화 실패해도 로컬 가입은 유지 (중복 가입 방지)
+      // 로컬/서버 스테이징 (관리자용) — 실패해도 가입은 유지
       try {
         await syncMemberAfterSignup(session);
       } catch (syncError) {
         console.warn("[signup] members API sync failed", syncError);
       }
 
-      const payload: GoogleSheetUserPayload = {
-        created_at: new Date().toISOString(),
-        user_id: user.id,
-        name: user.name.trim(),
-        nickname: user.nickname.trim(),
-        email: user.email.trim().toLowerCase(),
-      };
-
       if (isDevelopment) {
-        console.log("USER GOOGLE START");
-        console.log(payload);
-      }
-
-      const result = await syncToGoogleSheet("user", payload);
-
-      if (isDevelopment) {
-        console.log("USER GOOGLE RESULT", result);
+        console.log("SIGNUP OK", session.email);
       }
 
       router.replace("/today");

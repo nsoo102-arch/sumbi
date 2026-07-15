@@ -17,6 +17,8 @@ export type GoogleSheetUserPayload = {
   name: string;
   nickname: string;
   email: string;
+  /** salt:sha256 — signup/reset 시 필수, list 응답에는 없음 */
+  password_hash?: string;
 };
 
 export type GoogleSheetWeeklyPlanPayload = {
@@ -59,7 +61,7 @@ export type GoogleSheetSyncResult = {
   error?: string;
 };
 
-function getAppsScriptUrl(): string | null {
+export function getAppsScriptUrl(): string | null {
   const url = process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL?.trim();
   if (!url) {
     return null;
@@ -76,6 +78,74 @@ function getAppsScriptUrl(): string | null {
 
 export function isGoogleSheetSyncEnabled(): boolean {
   return GOOGLE_SHEET_SYNC_ENABLED && getAppsScriptUrl() !== null;
+}
+
+export type AppsScriptAuthUser = {
+  created_at?: string;
+  user_id: string;
+  name: string;
+  nickname: string;
+  email: string;
+  status?: string;
+};
+
+export type AppsScriptAuthResult =
+  | { ok: true; data: AppsScriptAuthUser }
+  | { ok: false; error: string };
+
+/** 회원가입/로그인/비밀번호 재설정용 Apps Script POST */
+export async function postAppsScriptAuth(
+  type: "signup" | "login" | "reset_password",
+  payload: Record<string, unknown>,
+): Promise<AppsScriptAuthResult> {
+  const url = getAppsScriptUrl();
+  if (!url) {
+    return {
+      ok: false,
+      error: "NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL이 설정되지 않았습니다.",
+    };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ type, payload }),
+    });
+
+    const responseText = await response.text();
+    const trimmed = responseText.trim();
+    const looksHtml =
+      trimmed.startsWith("<!") ||
+      trimmed.toLowerCase().startsWith("<html");
+
+    if (!response.ok || looksHtml || !trimmed) {
+      return {
+        ok: false,
+        error: looksHtml
+          ? "서버 응답이 올바르지 않습니다. Apps Script를 새 버전으로 재배포해 주세요."
+          : "서버 응답이 올바르지 않습니다. Apps Script 배포를 확인해 주세요.",
+      };
+    }
+
+    const parsed = JSON.parse(trimmed) as {
+      success?: boolean;
+      data?: AppsScriptAuthUser;
+      error?: string;
+    };
+
+    if (!parsed.success || !parsed.data) {
+      return {
+        ok: false,
+        error: parsed.error || "요청에 실패했습니다.",
+      };
+    }
+
+    return { ok: true, data: parsed.data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message || "네트워크 오류가 발생했습니다." };
+  }
 }
 
 const SYNC_SEND_LABELS: Record<GoogleSheetSyncType, string> = {
