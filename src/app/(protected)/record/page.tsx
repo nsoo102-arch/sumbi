@@ -69,7 +69,7 @@ export default function RecordPage() {
         console.warn("[record] syncBreathRecord failed", syncError);
       }
 
-      router.push("/footprints");
+      router.push("/home");
     } catch (submitError) {
       console.error("[record] submit failed", submitError);
       setError("기록을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
