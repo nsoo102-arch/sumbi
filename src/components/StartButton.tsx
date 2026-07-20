@@ -1,19 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 
+/** 랜딩 "시작하기" — 클릭 시점에 세션을 확인해 이동 */
 export function StartButton() {
-  const [href, setHref] = useState("/login/signup");
+  const router = useRouter();
 
-  useEffect(() => {
-    setHref(isAuthenticated() ? "/home" : "/login/signup");
-  }, []);
+  function handleStart() {
+    if (isAuthenticated()) {
+      router.push("/home");
+      return;
+    }
+    router.push("/login/email");
+  }
 
   return (
-    <Link href={href} className="sumbi-btn mt-4">
+    <button type="button" className="sumbi-btn mt-4" onClick={handleStart}>
       시작하기
-    </Link>
+    </button>
   );
 }

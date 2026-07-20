@@ -25,7 +25,7 @@ export default function SavedPage() {
       </p>
 
       <div className="flex justify-center">
-        <Button onClick={() => router.push("/")}>다시 숨비하기</Button>
+        <Button onClick={() => router.push("/home")}>다시 숨비하기</Button>
       </div>
     </section>
   );

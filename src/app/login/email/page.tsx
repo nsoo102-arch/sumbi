@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Button, Card } from "@/components";
-import { signIn } from "@/lib";
+import { isAuthenticated, signIn } from "@/lib";
 
 export default function EmailLoginPage() {
   const router = useRouter();
@@ -12,6 +12,12 @@ export default function EmailLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.replace("/home");
+    }
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,7 +32,7 @@ export default function EmailLoginPage() {
       return;
     }
 
-    router.push("/home");
+    router.replace("/home");
   }
 
   return (
@@ -75,7 +81,7 @@ export default function EmailLoginPage() {
             </Link>
           </p>
           <p>
-            <Link href="/login" className="sumbi-link-muted">
+            <Link href="/" className="sumbi-link-muted">
               돌아가기
             </Link>
           </p>

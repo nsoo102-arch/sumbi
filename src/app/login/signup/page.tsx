@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Button, Card } from "@/components";
-import { signUp } from "@/lib/auth";
+import { isAuthenticated, signUp } from "@/lib/auth";
 import { initializeUserProfile } from "@/lib/storage";
 import { syncMemberAfterSignup } from "@/lib/sheetSync";
 
@@ -19,6 +19,12 @@ export default function SignupPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.replace("/home");
+    }
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
