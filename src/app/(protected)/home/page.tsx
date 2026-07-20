@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Card } from "@/components";
-import {
-  clearSession,
-  getPracticeRates,
-  getSession,
-  loadSumbi,
-} from "@/lib";
-import type { PracticeRates } from "@/lib";
+import { clearSession, getSession } from "@/lib";
 import type { SumbiLetter } from "@/types";
 
 function isUnreadLetter(letter: SumbiLetter): boolean {
@@ -19,18 +12,8 @@ function isUnreadLetter(letter: SumbiLetter): boolean {
 
 export default function HomePage() {
   const router = useRouter();
-  const [rates, setRates] = useState<PracticeRates>({
-    hasBreathedToday: false,
-    weekRate: 0,
-    monthRate: 0,
-  });
   const [unreadCount, setUnreadCount] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    const data = loadSumbi();
-    setRates(getPracticeRates(data.records));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,21 +65,6 @@ export default function HomePage() {
       >
         숨 쉬는 곳
       </h1>
-
-      <div className="sumbi-content mb-10 grid grid-cols-2 gap-3">
-        <Card compact className="text-center">
-          <p className="sumbi-caption mb-2">이번 주 실천률</p>
-          <p className="text-[1.5rem] font-normal tracking-[0.04em] text-sumbi-primary">
-            {rates.weekRate}%
-          </p>
-        </Card>
-        <Card compact className="text-center">
-          <p className="sumbi-caption mb-2">이번 달 실천률</p>
-          <p className="text-[1.5rem] font-normal tracking-[0.04em] text-sumbi-primary">
-            {rates.monthRate}%
-          </p>
-        </Card>
-      </div>
 
       <nav className="sumbi-content mb-8 flex w-full flex-col gap-3" aria-label="홈 메뉴">
         <Link href="/today" className="sumbi-home-menu-card">
