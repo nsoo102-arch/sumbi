@@ -42,3 +42,6 @@ next-env.d.ts
 
 # sheet staging (시범 운영 임시 저장)
 /.data/
+
+# local helper scripts (not part of the app)
+/scripts/commit-beta.js
