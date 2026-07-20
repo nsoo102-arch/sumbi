@@ -76,6 +76,18 @@ export type SumbiLetter = {
   status: SumbiLetterStatus;
 };
 
+/** Google Sheets LetterReplies 시트 행 (참여자 → 수 답장) */
+export type LetterReply = {
+  replyId: string;
+  letterId: string;
+  userId: string;
+  email: string;
+  nickname: string;
+  replyContent: string;
+  createdAt: string;
+  isRead: boolean;
+};
+
 /** 관리자 대시보드 최근 가입자 */
 export type AdminRecentUser = {
   user_id: string;

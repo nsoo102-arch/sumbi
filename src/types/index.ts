@@ -15,6 +15,7 @@ export type {
   AdminSummary,
   AdminWeeklyTrend,
   BreathRecordSheetRow,
+  LetterReply,
   LetterSentStatus,
   LetterSheetRow,
   MemberDailyRecord,

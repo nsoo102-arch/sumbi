@@ -13,6 +13,11 @@ export { getFootprintsSummary } from "./footprints";
 export type { FootprintsSummary } from "./footprints";
 export { getPracticeRates } from "./practiceRates";
 export type { PracticeRates } from "./practiceRates";
+export {
+  formatLetterDate,
+  getLetterTitle,
+  isUnreadLetter,
+} from "./letters";
 export { getWeekKey, getWeekStart, isCurrentWeek } from "./week";
 export {
   commitRecord,

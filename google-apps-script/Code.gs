@@ -6,7 +6,7 @@
  * 2. 배포 > 배포 관리 > 연필(수정) > 버전: "새 버전" > 배포
  * 3. 실행: 나 | 액세스: 모든 사용자
  *
- * 시트 탭: users, weekly_plan, daily_record, letters, AdminNotes
+ * 시트 탭: users, weekly_plan, daily_record, letters, LetterReplies, AdminNotes
  *
  * users 컬럼 (현재 시트 헤더):
  * A created_at | B user_id | C name | D nickname | E email | F password_hash
@@ -30,6 +30,9 @@
  * letters 컬럼 (없으면 자동 생성):
  * A id | B email | C name | D nickname | E message | F sent_at | G read_at | H status
  * status: unread | read
+ *
+ * LetterReplies 컬럼 (없으면 자동 생성, 참여자 답장):
+ * A replyId | B letterId | C userId | D email | E nickname | F replyContent | G createdAt | H isRead
  *
  * AdminNotes 컬럼 (없으면 자동 생성, 관리자 전용):
  * A email | B note | C updated_at
@@ -1368,6 +1371,270 @@ function markLetterRead(payload) {
   });
 }
 
+function getOrCreateLetterRepliesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("LetterReplies");
+  var headers = [
+    "replyId",
+    "letterId",
+    "userId",
+    "email",
+    "nickname",
+    "replyContent",
+    "createdAt",
+    "isRead",
+  ];
+
+  if (!sheet) {
+    sheet = ss.insertSheet("LetterReplies");
+    sheet.appendRow(headers);
+    return sheet;
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  }
+
+  return sheet;
+}
+
+function buildLetterRepliesColumnMap(headerRow) {
+  var map = {
+    replyId: 0,
+    letterId: 1,
+    userId: 2,
+    email: 3,
+    nickname: 4,
+    replyContent: 5,
+    createdAt: 6,
+    isRead: 7,
+  };
+
+  if (!headerRow) {
+    return map;
+  }
+
+  headerRow.forEach(function (cell, index) {
+    var key = cellToString(cell).toLowerCase();
+    if (key === "replyid" || key === "reply_id" || key === "id") {
+      map.replyId = index;
+    } else if (key === "letterid" || key === "letter_id") {
+      map.letterId = index;
+    } else if (key === "userid" || key === "user_id") {
+      map.userId = index;
+    } else if (key === "email" || key === "이메일") {
+      map.email = index;
+    } else if (key === "nickname" || key === "닉네임" || key === "활동이름") {
+      map.nickname = index;
+    } else if (
+      key === "replycontent" ||
+      key === "reply_content" ||
+      key === "content" ||
+      key === "답장"
+    ) {
+      map.replyContent = index;
+    } else if (
+      key === "createdat" ||
+      key === "created_at" ||
+      key === "작성일"
+    ) {
+      map.createdAt = index;
+    } else if (key === "isread" || key === "is_read" || key === "읽음") {
+      map.isRead = index;
+    }
+  });
+
+  return map;
+}
+
+function rowToLetterReply(row, columnMap) {
+  var isReadRaw = cellToString(row[columnMap.isRead]).toLowerCase();
+  return {
+    replyId: cellToString(row[columnMap.replyId]),
+    letterId: cellToString(row[columnMap.letterId]),
+    userId: cellToString(row[columnMap.userId]),
+    email: cellToString(row[columnMap.email]),
+    nickname: cellToString(row[columnMap.nickname]),
+    replyContent: cellToString(row[columnMap.replyContent]),
+    createdAt: cellToString(row[columnMap.createdAt]),
+    isRead: isReadRaw === "true" || isReadRaw === "1" || isReadRaw === "yes",
+  };
+}
+
+function listLetterReplies(letterId, email) {
+  var normalizedLetterId = cellToString(letterId);
+  var normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedLetterId) {
+    return jsonResponse({
+      success: false,
+      error: "letterId가 필요합니다.",
+    });
+  }
+
+  var sheet = getOrCreateLetterRepliesSheet();
+  var values = sheet.getDataRange().getValues();
+
+  if (!values || values.length <= 1) {
+    return jsonResponse({ success: true, data: [] });
+  }
+
+  var columnMap = buildLetterRepliesColumnMap(values[0]);
+  var replies = [];
+
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var rowLetterId = cellToString(row[columnMap.letterId]);
+    if (rowLetterId !== normalizedLetterId) {
+      continue;
+    }
+
+    if (
+      normalizedEmail &&
+      normalizeEmail(row[columnMap.email]) !== normalizedEmail
+    ) {
+      continue;
+    }
+
+    var reply = rowToLetterReply(row, columnMap);
+    if (!reply.replyId && !reply.replyContent) {
+      continue;
+    }
+    replies.push(reply);
+  }
+
+  replies.sort(function (a, b) {
+    var aKey = a.createdAt || "";
+    var bKey = b.createdAt || "";
+    if (aKey < bKey) {
+      return 1;
+    }
+    if (aKey > bKey) {
+      return -1;
+    }
+    return 0;
+  });
+
+  return jsonResponse({ success: true, data: replies });
+}
+
+function createLetterReply(payload) {
+  var letterId = cellToString(payload.letterId || payload.letter_id);
+  var email = normalizeEmail(payload.email);
+  var replyContent = cellToString(
+    payload.replyContent || payload.reply_content || payload.message,
+  );
+  var userId = cellToString(payload.userId || payload.user_id);
+  var nickname = cellToString(payload.nickname);
+
+  if (!letterId) {
+    return jsonResponse({
+      success: false,
+      error: "letterId가 필요합니다.",
+    });
+  }
+
+  if (!email) {
+    return jsonResponse({
+      success: false,
+      error: "email이 필요합니다.",
+    });
+  }
+
+  if (!replyContent) {
+    return jsonResponse({
+      success: false,
+      error: "답장 내용이 비어 있습니다.",
+    });
+  }
+
+  // 해당 편지가 본인 것인지 확인
+  var lettersSheet = getOrCreateLettersSheet();
+  var letterValues = lettersSheet.getDataRange().getValues();
+  if (!letterValues || letterValues.length <= 1) {
+    return jsonResponse({
+      success: false,
+      error: "편지를 찾을 수 없습니다.",
+    });
+  }
+
+  var letterMap = buildLettersColumnMap(letterValues[0]);
+  var letterFound = false;
+  for (var li = 1; li < letterValues.length; li++) {
+    var letterRow = letterValues[li];
+    if (
+      cellToString(letterRow[letterMap.id]) === letterId &&
+      normalizeEmail(letterRow[letterMap.email]) === email
+    ) {
+      letterFound = true;
+      break;
+    }
+  }
+
+  if (!letterFound) {
+    return jsonResponse({
+      success: false,
+      error: "편지를 찾을 수 없습니다.",
+    });
+  }
+
+  var sheet = getOrCreateLetterRepliesSheet();
+  var values = sheet.getDataRange().getValues();
+  var columnMap = buildLetterRepliesColumnMap(values[0]);
+
+  // 편지당 답장 1회
+  for (var i = 1; i < values.length; i++) {
+    var existing = values[i];
+    if (
+      cellToString(existing[columnMap.letterId]) === letterId &&
+      normalizeEmail(existing[columnMap.email]) === email
+    ) {
+      return jsonResponse({
+        success: false,
+        error: "이미 답장을 보낸 편지입니다.",
+      });
+    }
+  }
+
+  var reply = {
+    replyId: cellToString(payload.replyId || payload.reply_id) || Utilities.getUuid(),
+    letterId: letterId,
+    userId: userId,
+    email: email,
+    nickname: nickname,
+    replyContent: replyContent,
+    createdAt: cellToString(payload.createdAt || payload.created_at) || new Date().toISOString(),
+    isRead: false,
+  };
+
+  var row = [];
+  var maxCol = Math.max(
+    columnMap.replyId,
+    columnMap.letterId,
+    columnMap.userId,
+    columnMap.email,
+    columnMap.nickname,
+    columnMap.replyContent,
+    columnMap.createdAt,
+    columnMap.isRead,
+  );
+  for (var c = 0; c <= maxCol; c++) {
+    row[c] = "";
+  }
+  row[columnMap.replyId] = reply.replyId;
+  row[columnMap.letterId] = reply.letterId;
+  row[columnMap.userId] = reply.userId;
+  row[columnMap.email] = reply.email;
+  row[columnMap.nickname] = reply.nickname;
+  row[columnMap.replyContent] = reply.replyContent;
+  row[columnMap.createdAt] = reply.createdAt;
+  row[columnMap.isRead] = "false";
+
+  sheet.appendRow(row);
+
+  return jsonResponse({ success: true, data: reply });
+}
+
 function getOrCreateAdminNotesSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("AdminNotes");
@@ -2349,10 +2616,17 @@ function doGet(e) {
       return listInactiveThisWeek();
     }
 
+    if (action === "list_letter_replies") {
+      var replyLetterId =
+        e && e.parameter ? e.parameter.letterId || e.parameter.letter_id : "";
+      var replyEmail = e && e.parameter ? e.parameter.email : "";
+      return listLetterReplies(replyLetterId, replyEmail);
+    }
+
     return jsonResponse({
       success: false,
       error:
-        "Unknown action. Use list_users, get_member, list_letters, get_letters, admin_summary, admin_stats, list_daily_by_date, list_unread_letters, get_admin_note, or list_inactive_this_week",
+        "Unknown action. Use list_users, get_member, list_letters, get_letters, admin_summary, admin_stats, list_daily_by_date, list_unread_letters, get_admin_note, list_inactive_this_week, or list_letter_replies",
     });
   } catch (error) {
     return jsonResponse({ success: false, error: String(error) });
@@ -2435,6 +2709,17 @@ function doPost(e) {
 
     if (type === "mark_letter_read" || type === "read_letter") {
       return markLetterRead(payload);
+    }
+
+    if (type === "list_letter_replies") {
+      return listLetterReplies(
+        payload.letterId || payload.letter_id || body.letterId || "",
+        payload.email || body.email || "",
+      );
+    }
+
+    if (type === "create_letter_reply") {
+      return createLetterReply(payload);
     }
 
     if (type === "get_admin_note") {

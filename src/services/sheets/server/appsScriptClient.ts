@@ -11,6 +11,7 @@ import type {
   MemberDailyRecord,
   MemberDetail,
   MemberSheetRow,
+  LetterReply,
   MemberWeeklyPlan,
   SumbiLetter,
 } from "@/types/sheets";
@@ -623,6 +624,156 @@ export async function listLettersFromAppsScript(
   throw new Error(
     `Google Sheets 숨편지 목록을 불러오지 못했습니다. ${errors.join(" / ")}`,
   );
+}
+
+function parseLetterReply(raw: unknown): LetterReply | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const row = raw as Record<string, unknown>;
+  const replyId = asString(row.replyId ?? row.reply_id ?? row.id);
+  const letterId = asString(row.letterId ?? row.letter_id);
+  const replyContent = asString(
+    row.replyContent ?? row.reply_content ?? row.message,
+  );
+
+  if (!replyId && !replyContent) {
+    return null;
+  }
+
+  const isReadRaw = row.isRead ?? row.is_read;
+  const isRead =
+    isReadRaw === true ||
+    isReadRaw === 1 ||
+    String(isReadRaw).toLowerCase() === "true" ||
+    String(isReadRaw).toLowerCase() === "1";
+
+  return {
+    replyId,
+    letterId,
+    userId: asString(row.userId ?? row.user_id),
+    email: normalizeEmail(asString(row.email)),
+    nickname: asString(row.nickname),
+    replyContent,
+    createdAt: asString(row.createdAt ?? row.created_at),
+    isRead,
+  };
+}
+
+function parseLetterRepliesResponse(text: string): LetterReply[] {
+  const parsed = parseAppsScriptJson(text, "list_letter_replies");
+
+  if (parsed.success === false) {
+    throw new Error(parsed.error || "답장 목록 조회에 실패했습니다.");
+  }
+
+  if (!Array.isArray(parsed.data)) {
+    throw new Error("답장 목록 응답 형식이 올바르지 않습니다.");
+  }
+
+  return parsed.data
+    .map(parseLetterReply)
+    .filter((row): row is LetterReply => row !== null);
+}
+
+function parseLetterReplyResponse(text: string, context: string): LetterReply {
+  const parsed = parseAppsScriptJson(text, context);
+
+  if (parsed.success === false) {
+    throw new Error(parsed.error || "답장 처리에 실패했습니다.");
+  }
+
+  const reply = parseLetterReply(parsed.data);
+  if (!reply) {
+    throw new Error("답장 응답 형식이 올바르지 않습니다.");
+  }
+
+  return reply;
+}
+
+/** 편지별 답장 목록을 조회합니다. */
+export async function listLetterRepliesFromAppsScript(input: {
+  letterId: string;
+  email?: string;
+}): Promise<LetterReply[]> {
+  const letterId = input.letterId.trim();
+  const email = normalizeEmail(input.email ?? "");
+
+  if (!letterId) {
+    throw new Error("letterId가 필요합니다.");
+  }
+
+  const baseUrl = getAppsScriptUrl();
+  if (!baseUrl) {
+    throw new Error("Apps Script URL이 설정되지 않았습니다.");
+  }
+
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("action", "list_letter_replies");
+    url.searchParams.set("letterId", letterId);
+    if (email) {
+      url.searchParams.set("email", email);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      cache: "no-store",
+      redirect: "follow",
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`답장 목록을 불러오지 못했습니다. (${response.status})`);
+    }
+    return parseLetterRepliesResponse(text);
+  } catch {
+    const text = await postAppsScriptAction(baseUrl, "list_letter_replies", {
+      letterId,
+      email,
+    });
+    return parseLetterRepliesResponse(text);
+  }
+}
+
+/** 숨편지에 답장을 저장합니다. 편지당 1회만 가능합니다. */
+export async function createLetterReplyInAppsScript(input: {
+  letterId: string;
+  email: string;
+  userId?: string;
+  nickname?: string;
+  replyContent: string;
+}): Promise<LetterReply> {
+  const letterId = input.letterId.trim();
+  const email = normalizeEmail(input.email);
+  const replyContent = input.replyContent.trim();
+
+  if (!letterId) {
+    throw new Error("letterId가 필요합니다.");
+  }
+  if (!email) {
+    throw new Error("이메일이 필요합니다.");
+  }
+  if (!replyContent) {
+    throw new Error("답장 내용이 비어 있습니다.");
+  }
+
+  const baseUrl = getAppsScriptUrl();
+  if (!baseUrl) {
+    throw new Error("Apps Script URL이 설정되지 않았습니다.");
+  }
+
+  const text = await postAppsScriptAction(baseUrl, "create_letter_reply", {
+    replyId: crypto.randomUUID(),
+    letterId,
+    email,
+    userId: (input.userId ?? "").trim(),
+    nickname: (input.nickname ?? "").trim(),
+    replyContent,
+    createdAt: new Date().toISOString(),
+  });
+
+  return parseLetterReplyResponse(text, "create_letter_reply");
 }
 
 /** 숨편지를 읽음 처리합니다. email+id로 본인 편지인지 검증합니다. */

@@ -87,7 +87,7 @@ export default function HomePage() {
           </span>
         </Link>
 
-        <Link href="/footprints" className="sumbi-home-menu-card">
+        <Link href="/letters" className="sumbi-home-menu-card">
           <span className="sumbi-home-menu-emoji" aria-hidden>
             💌
           </span>

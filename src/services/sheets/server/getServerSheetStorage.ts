@@ -4,6 +4,7 @@ import { googleSheetsService } from "./googleSheetsService";
 import { serverSheetStorage } from "./serverSheetStorage";
 import {
   createLetterInAppsScript,
+  createLetterReplyInAppsScript,
   getAdminNoteFromAppsScript,
   getAdminStatsFromAppsScript,
   getAdminSummaryFromAppsScript,
@@ -11,6 +12,7 @@ import {
   isAppsScriptConfigured,
   listDailyByDateFromAppsScript,
   listInactiveThisWeekFromAppsScript,
+  listLetterRepliesFromAppsScript,
   listLettersFromAppsScript,
   listMembersFromAppsScript,
   listUnreadLettersFromAppsScript,
@@ -25,6 +27,7 @@ import type {
   AdminRecentUser,
   AdminStats,
   AdminSummary,
+  LetterReply,
   MemberDetail,
   MemberSheetRow,
   SumbiLetter,
@@ -116,6 +119,33 @@ export async function markLetterRead(input: {
   }
 
   return markLetterReadInAppsScript(input);
+}
+
+export async function listLetterReplies(input: {
+  letterId: string;
+  email?: string;
+}): Promise<LetterReply[]> {
+  if (!isAppsScriptConfigured()) {
+    return [];
+  }
+
+  return listLetterRepliesFromAppsScript(input);
+}
+
+export async function createLetterReply(input: {
+  letterId: string;
+  email: string;
+  userId?: string;
+  nickname?: string;
+  replyContent: string;
+}): Promise<LetterReply> {
+  if (!isAppsScriptConfigured()) {
+    throw new Error(
+      "Apps Script URL이 설정되지 않아 답장을 저장할 수 없습니다.",
+    );
+  }
+
+  return createLetterReplyInAppsScript(input);
 }
 
 export async function getAdminSummary(): Promise<AdminSummary> {
