@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card } from "@/components";
 import { getSession } from "@/lib/auth";
 import {
   formatLetterDate,
+  getLetterPreview,
   getLetterTitle,
   isUnreadLetter,
 } from "@/lib/letters";
@@ -15,6 +15,42 @@ type LettersState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; letters: SumbiLetter[] };
+
+function LetterListCard({
+  letter,
+  unread = false,
+}: {
+  letter: SumbiLetter;
+  unread?: boolean;
+}) {
+  const title = getLetterTitle(letter.message);
+  const preview = getLetterPreview(letter.message);
+
+  return (
+    <Link
+      href={`/letters/${encodeURIComponent(letter.id)}`}
+      className={
+        unread ? "sumbi-letter-card block" : "sumbi-letter-card-past block"
+      }
+    >
+      <p className="sumbi-caption mb-2">
+        {formatLetterDate(letter.sent_at)}
+      </p>
+      <p className="mb-2 flex items-center gap-2 text-[1.0625rem] font-normal tracking-[0.04em] text-sumbi-primary">
+        {unread && (
+          <span
+            className="sumbi-letter-unread-dot"
+            aria-label="읽지 않은 편지"
+          />
+        )}
+        <span className="min-w-0 break-words">{title}</span>
+      </p>
+      {preview ? (
+        <p className="sumbi-letter-preview">{preview}</p>
+      ) : null}
+    </Link>
+  );
+}
 
 export default function LettersMailboxPage() {
   const [state, setState] = useState<LettersState>({ status: "loading" });
@@ -80,46 +116,41 @@ export default function LettersMailboxPage() {
 
   return (
     <section className="sumbi-page-scroll items-center">
-      <h1 className="sumbi-heading-form">숨편지</h1>
+      <h1 className="sumbi-letters-title">숨편지</h1>
+      <p className="sumbi-letters-intro">
+        숨을 기록하면,
+        <br />
+        편지가 되어 돌아옵니다.
+      </p>
 
       <div className="sumbi-content mb-10 w-full space-y-10">
         {state.status === "loading" && (
-          <Card compact>
+          <div className="sumbi-letters-empty">
             <p className="sumbi-loading">숨편지를 확인하는 중…</p>
-          </Card>
+          </div>
         )}
 
         {state.status === "error" && (
-          <Card compact>
+          <div className="sumbi-letters-empty">
             <p className="sumbi-error-center">{state.message}</p>
-          </Card>
+          </div>
         )}
 
         {state.status === "ready" && (
           <>
             <section>
-              <h2 className="sumbi-subheading">새로 도착한 숨편지</h2>
+              <h2 className="sumbi-subheading">새로 온 숨편지</h2>
               {unreadLetters.length === 0 ? (
-                <Card compact>
-                  <p className="sumbi-loading">
-                    새로 도착한 숨편지가 없습니다.
+                <div className="sumbi-letters-empty">
+                  <p className="sumbi-letters-empty-text">
+                    숨편지를 기다리세요.
                   </p>
-                </Card>
+                </div>
               ) : (
                 <ul className="space-y-3">
                   {unreadLetters.map((letter) => (
                     <li key={letter.id}>
-                      <Link
-                        href={`/letters/${encodeURIComponent(letter.id)}`}
-                        className="sumbi-letter-card block"
-                      >
-                        <p className="mb-2 text-[1.0625rem] font-normal tracking-[0.04em] text-sumbi-primary">
-                          {getLetterTitle(letter.message)}
-                        </p>
-                        <p className="sumbi-caption">
-                          {formatLetterDate(letter.sent_at)}
-                        </p>
-                      </Link>
+                      <LetterListCard letter={letter} unread />
                     </li>
                   ))}
                 </ul>
@@ -129,24 +160,16 @@ export default function LettersMailboxPage() {
             <section>
               <h2 className="sumbi-subheading">지난 숨편지</h2>
               {pastLetters.length === 0 ? (
-                <Card compact>
-                  <p className="sumbi-loading">지난 숨편지가 아직 없습니다.</p>
-                </Card>
+                <div className="sumbi-letters-empty">
+                  <p className="sumbi-letters-empty-text">
+                    아직 받은 숨편지가 없습니다.
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-3">
                   {pastLetters.map((letter) => (
                     <li key={letter.id}>
-                      <Link
-                        href={`/letters/${encodeURIComponent(letter.id)}`}
-                        className="sumbi-letter-card-past block"
-                      >
-                        <p className="sumbi-caption mb-2">
-                          {formatLetterDate(letter.sent_at)}
-                        </p>
-                        <p className="truncate text-[0.9375rem] font-light tracking-[0.03em] text-sumbi-text/80">
-                          {getLetterTitle(letter.message)}
-                        </p>
-                      </Link>
+                      <LetterListCard letter={letter} />
                     </li>
                   ))}
                 </ul>
@@ -157,8 +180,8 @@ export default function LettersMailboxPage() {
       </div>
 
       <div className="flex justify-center">
-        <Link href="/home" className="sumbi-link-muted text-[0.9375rem]">
-          홈으로
+        <Link href="/home" className="sumbi-letters-back">
+          ← 숨 쉬는 곳으로
         </Link>
       </div>
     </section>

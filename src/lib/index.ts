@@ -15,6 +15,7 @@ export { getPracticeRates } from "./practiceRates";
 export type { PracticeRates } from "./practiceRates";
 export {
   formatLetterDate,
+  getLetterPreview,
   getLetterTitle,
   isUnreadLetter,
 } from "./letters";
