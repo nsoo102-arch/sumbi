@@ -79,7 +79,7 @@ export default function RecordPage() {
 
   return (
     <section className="sumbi-page items-center">
-      <h1 className="sumbi-heading-tight">숨 돌아보기</h1>
+      <h1 className="sumbi-heading-tight">숨 기록하기</h1>
 
       <p className="sumbi-body mb-10">
         오늘 하루는 어떻게 숨비했는지
@@ -88,7 +88,7 @@ export default function RecordPage() {
       </p>
 
       {activities.length > 0 && (
-        <ul className="sumbi-content mb-12 space-y-4">
+        <ul className="sumbi-content mb-10 space-y-4">
           {activities.map((activity, index) => (
             <li key={`${activity}-${index}`}>
               <label className="sumbi-body flex cursor-pointer items-start gap-3 text-left">
@@ -105,9 +105,7 @@ export default function RecordPage() {
         </ul>
       )}
 
-      <h2 className="sumbi-heading-tight">숨 기록하기</h2>
-
-      <p className="sumbi-body mb-10">
+      <p className="sumbi-body mb-8">
         오늘 하루 기억하고 싶은 순간이나
         <br />
         마음이 있다면 남겨보세요.
@@ -131,9 +129,9 @@ export default function RecordPage() {
           type="button"
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          aria-label="다음"
+          aria-label="숨 저장"
         >
-          {submitting ? "저장 중…" : "다음"}
+          {submitting ? "저장 중…" : "숨 저장"}
         </Button>
       </div>
     </section>
