@@ -44,24 +44,17 @@ export default function TodayPage() {
     saveWeeklyActivities(filled);
     saveDraftActivity(filled.join("\n"));
     void syncWeeklyPlanAfterSave(filled);
-    router.push("/record");
+    router.push("/home");
   }
 
   return (
     <section className="sumbi-page items-center">
       <h1 className="sumbi-today-title">나의 숨비소리</h1>
 
-      <p className="sumbi-today-desc mb-10">
-        일상적으로 반복하는
+      <p className="sumbi-today-desc mb-8">
+        이번 한 주
         <br />
-        나를 숨 쉬게 해주는
-        <br />
-        소소한 활동을 정해보세요.
-        <br />
-        <br />
-        언제든 추가와 변경이 가능합니다.
-        <br />
-        변경 사항이 없다면 바로 다음을 눌러주세요.
+        나를 위한 활동을 계획해 보세요.
       </p>
 
       <div className="sumbi-content mb-14 flex flex-col space-y-4">
@@ -78,7 +71,7 @@ export default function TodayPage() {
       </div>
 
       <div className="flex justify-center">
-        <Button onClick={handleSubmit}>다음</Button>
+        <Button onClick={handleSubmit}>저장</Button>
       </div>
     </section>
   );
