@@ -76,13 +76,12 @@ export default function HomePage() {
 
   return (
     <section className="sumbi-page-scroll items-center">
-      <h1 className="sumbi-heading-tight">오늘도 숨비하셨나요?</h1>
-
-      <p className="sumbi-muted mb-8 text-center">
-        {rates.hasBreathedToday
-          ? "오늘도 숨을 남기셨네요."
-          : "아직 오늘의 숨이 없어요."}
-      </p>
+      <h1
+        className="sumbi-heading-tight mb-8"
+        style={{ fontWeight: 600 }}
+      >
+        숨 쉬는 곳
+      </h1>
 
       <div className="sumbi-content mb-10 grid grid-cols-2 gap-3">
         <Card compact className="text-center">
