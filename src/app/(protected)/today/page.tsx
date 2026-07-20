@@ -49,9 +49,9 @@ export default function TodayPage() {
 
   return (
     <section className="sumbi-page items-center">
-      <h1 className="sumbi-heading-tight">이번 주 나의 숨비소리</h1>
+      <h1 className="sumbi-today-title">이번 주 나의 숨비소리</h1>
 
-      <p className="sumbi-body mb-10">
+      <p className="sumbi-today-desc mb-10">
         이번 주 나를 숨 쉬게 할
         <br />
         소소한 활동을 정해보세요.

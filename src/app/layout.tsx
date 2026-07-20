@@ -4,7 +4,7 @@ import { SharedLayout } from "@/layouts";
 import "./globals.css";
 
 const notoSerif = Noto_Serif_KR({
-  weight: ["300", "400"],
+  weight: ["300", "400", "600"],
   display: "swap",
   variable: "--font-noto-serif",
 });
