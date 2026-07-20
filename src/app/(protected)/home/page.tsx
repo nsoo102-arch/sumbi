@@ -72,8 +72,22 @@ export default function HomePage() {
             🌿
           </span>
           <span className="sumbi-home-menu-text">
-            <span className="sumbi-home-menu-title">오늘의 숨</span>
-            <span className="sumbi-home-menu-desc">이번 주 활동을 정하고 기록해요</span>
+            <span className="sumbi-home-menu-title">숨 계획하기</span>
+            <span className="sumbi-home-menu-desc">
+              이번 주 나를 숨 쉬게 할 활동을 정해보세요.
+            </span>
+          </span>
+        </Link>
+
+        <Link href="/record" className="sumbi-home-menu-card">
+          <span className="sumbi-home-menu-emoji" aria-hidden>
+            ✒
+          </span>
+          <span className="sumbi-home-menu-text">
+            <span className="sumbi-home-menu-title">숨 기록하기</span>
+            <span className="sumbi-home-menu-desc">
+              오늘 하루를 기록해 보세요.
+            </span>
           </span>
         </Link>
 
@@ -82,8 +96,8 @@ export default function HomePage() {
             📚
           </span>
           <span className="sumbi-home-menu-text">
-            <span className="sumbi-home-menu-title">지난 숨</span>
-            <span className="sumbi-home-menu-desc">쌓아 온 숨을 돌아봐요</span>
+            <span className="sumbi-home-menu-title">숨창고</span>
+            <span className="sumbi-home-menu-desc">쌓아 온 숨을 돌아봐요.</span>
           </span>
         </Link>
 
@@ -98,7 +112,7 @@ export default function HomePage() {
                 <span className="sumbi-home-badge">새 편지 {unreadCount}</span>
               )}
             </span>
-            <span className="sumbi-home-menu-desc">도착한 숨편지를 읽어요</span>
+            <span className="sumbi-home-menu-desc">도착한 숨편지를 읽어요.</span>
           </span>
         </Link>
 
