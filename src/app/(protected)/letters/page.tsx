@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button } from "@/components";
 import { getSession } from "@/lib/auth";
 import {
   formatLetterDate,
@@ -53,6 +55,7 @@ function LetterListCard({
 }
 
 export default function LettersMailboxPage() {
+  const router = useRouter();
   const [state, setState] = useState<LettersState>({ status: "loading" });
 
   useEffect(() => {
@@ -180,9 +183,9 @@ export default function LettersMailboxPage() {
       </div>
 
       <div className="flex justify-center">
-        <Link href="/home" className="sumbi-letters-back">
-          ← 숨 쉬는 곳으로
-        </Link>
+        <Button type="button" onClick={() => router.push("/home")}>
+          숨 쉬는 곳으로
+        </Button>
       </div>
     </section>
   );

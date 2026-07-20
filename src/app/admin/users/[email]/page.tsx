@@ -371,7 +371,7 @@ export default function AdminUserDetailPage() {
     <main className="admin-page">
       <div className="admin-container">
         <Link href="/admin/users" className="admin-back">
-          ← 사람 만나기로
+          ← 회원으로
         </Link>
 
         <h1 className="admin-title">{title}</h1>

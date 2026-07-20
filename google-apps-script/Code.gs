@@ -1518,6 +1518,90 @@ function listLetterReplies(letterId, email) {
   return jsonResponse({ success: true, data: replies });
 }
 
+function listUnreadLetterReplies(limit) {
+  var sheet = getOrCreateLetterRepliesSheet();
+  var values = sheet.getDataRange().getValues();
+
+  if (!values || values.length <= 1) {
+    return jsonResponse({ success: true, data: [] });
+  }
+
+  var columnMap = buildLetterRepliesColumnMap(values[0]);
+  var replies = [];
+
+  for (var i = 1; i < values.length; i++) {
+    var reply = rowToLetterReply(values[i], columnMap);
+    if (!reply.replyId && !reply.replyContent) {
+      continue;
+    }
+    if (reply.isRead) {
+      continue;
+    }
+    replies.push(reply);
+  }
+
+  replies.sort(function (a, b) {
+    var aKey = a.createdAt || "";
+    var bKey = b.createdAt || "";
+    if (aKey < bKey) {
+      return 1;
+    }
+    if (aKey > bKey) {
+      return -1;
+    }
+    return 0;
+  });
+
+  var max = limit || 100;
+  return jsonResponse({
+    success: true,
+    data: replies.slice(0, max),
+  });
+}
+
+function markLetterReplyRead(payload) {
+  var replyId = cellToString(payload.replyId || payload.reply_id || payload.id);
+
+  if (!replyId) {
+    return jsonResponse({
+      success: false,
+      error: "replyId가 필요합니다.",
+    });
+  }
+
+  var sheet = getOrCreateLetterRepliesSheet();
+  var values = sheet.getDataRange().getValues();
+
+  if (!values || values.length <= 1) {
+    return jsonResponse({
+      success: false,
+      error: "답장을 찾을 수 없습니다.",
+    });
+  }
+
+  var columnMap = buildLetterRepliesColumnMap(values[0]);
+
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    if (cellToString(row[columnMap.replyId]) !== replyId) {
+      continue;
+    }
+
+    sheet.getRange(i + 1, columnMap.isRead + 1).setValue("true");
+    SpreadsheetApp.flush();
+
+    var updated = rowToLetterReply(row, columnMap);
+    updated.isRead = true;
+
+    return jsonResponse({ success: true, data: updated });
+  }
+
+  return jsonResponse({
+    success: false,
+    error: "답장을 찾을 수 없습니다.",
+  });
+}
+
 function createLetterReply(payload) {
   var letterId = cellToString(payload.letterId || payload.letter_id);
   var email = normalizeEmail(payload.email);
@@ -2623,10 +2707,18 @@ function doGet(e) {
       return listLetterReplies(replyLetterId, replyEmail);
     }
 
+    if (action === "list_unread_letter_replies") {
+      var unreadReplyLimit =
+        e && e.parameter && e.parameter.limit
+          ? Number(e.parameter.limit)
+          : 100;
+      return listUnreadLetterReplies(unreadReplyLimit);
+    }
+
     return jsonResponse({
       success: false,
       error:
-        "Unknown action. Use list_users, get_member, list_letters, get_letters, admin_summary, admin_stats, list_daily_by_date, list_unread_letters, get_admin_note, list_inactive_this_week, or list_letter_replies",
+        "Unknown action. Use list_users, get_member, list_letters, get_letters, admin_summary, admin_stats, list_daily_by_date, list_unread_letters, get_admin_note, list_inactive_this_week, list_letter_replies, or list_unread_letter_replies",
     });
   } catch (error) {
     return jsonResponse({ success: false, error: String(error) });
@@ -2720,6 +2812,14 @@ function doPost(e) {
 
     if (type === "create_letter_reply") {
       return createLetterReply(payload);
+    }
+
+    if (type === "list_unread_letter_replies") {
+      return listUnreadLetterReplies(payload.limit || body.limit || 100);
+    }
+
+    if (type === "mark_letter_reply_read") {
+      return markLetterReplyRead(payload);
     }
 
     if (type === "get_admin_note") {

@@ -736,6 +736,62 @@ export async function listLetterRepliesFromAppsScript(input: {
   }
 }
 
+/** 관리자용: 읽지 않은 답장 목록 */
+export async function listUnreadLetterRepliesFromAppsScript(
+  limit = 100,
+): Promise<LetterReply[]> {
+  const baseUrl = getAppsScriptUrl();
+  if (!baseUrl) {
+    throw new Error("Apps Script URL이 설정되지 않았습니다.");
+  }
+
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("action", "list_unread_letter_replies");
+    url.searchParams.set("limit", String(limit));
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      cache: "no-store",
+      redirect: "follow",
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(
+        `읽지 않은 답장을 불러오지 못했습니다. (${response.status})`,
+      );
+    }
+    return parseLetterRepliesResponse(text);
+  } catch {
+    const text = await postAppsScriptAction(
+      baseUrl,
+      "list_unread_letter_replies",
+      { limit },
+    );
+    return parseLetterRepliesResponse(text);
+  }
+}
+
+/** 관리자용: 답장 읽음 처리 */
+export async function markLetterReplyReadInAppsScript(input: {
+  replyId: string;
+}): Promise<LetterReply> {
+  const replyId = input.replyId.trim();
+  if (!replyId) {
+    throw new Error("replyId가 필요합니다.");
+  }
+
+  const baseUrl = getAppsScriptUrl();
+  if (!baseUrl) {
+    throw new Error("Apps Script URL이 설정되지 않았습니다.");
+  }
+
+  const text = await postAppsScriptAction(baseUrl, "mark_letter_reply_read", {
+    replyId,
+  });
+  return parseLetterReplyResponse(text, "mark_letter_reply_read");
+}
+
 /** 숨편지에 답장을 저장합니다. 편지당 1회만 가능합니다. */
 export async function createLetterReplyInAppsScript(input: {
   letterId: string;

@@ -22,7 +22,9 @@ function isProtectedAdminApi(request: NextRequest): boolean {
     pathname === "/api/sheets/admin-inactive-week" ||
     pathname === "/api/sheets/daily" ||
     pathname === "/api/sheets/member" ||
-    pathname === "/api/sheets/letters/unread"
+    pathname === "/api/sheets/letters/unread" ||
+    pathname === "/api/sheets/letters/replies/unread" ||
+    pathname === "/api/sheets/letters/replies/read"
   ) {
     return true;
   }
@@ -88,5 +90,7 @@ export const config = {
     "/api/sheets/member",
     "/api/sheets/members",
     "/api/sheets/letters/unread",
+    "/api/sheets/letters/replies/unread",
+    "/api/sheets/letters/replies/read",
   ],
 };

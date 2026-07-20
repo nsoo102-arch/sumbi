@@ -15,8 +15,10 @@ import {
   listLetterRepliesFromAppsScript,
   listLettersFromAppsScript,
   listMembersFromAppsScript,
+  listUnreadLetterRepliesFromAppsScript,
   listUnreadLettersFromAppsScript,
   markLetterReadInAppsScript,
+  markLetterReplyReadInAppsScript,
   normalizeEmail,
   saveAdminNoteInAppsScript,
 } from "./appsScriptClient";
@@ -146,6 +148,28 @@ export async function createLetterReply(input: {
   }
 
   return createLetterReplyInAppsScript(input);
+}
+
+export async function listUnreadLetterReplies(
+  limit = 100,
+): Promise<LetterReply[]> {
+  if (!isAppsScriptConfigured()) {
+    return [];
+  }
+
+  return listUnreadLetterRepliesFromAppsScript(limit);
+}
+
+export async function markLetterReplyRead(input: {
+  replyId: string;
+}): Promise<LetterReply> {
+  if (!isAppsScriptConfigured()) {
+    throw new Error(
+      "Apps Script URL이 설정되지 않아 읽음 처리할 수 없습니다.",
+    );
+  }
+
+  return markLetterReplyReadInAppsScript(input);
 }
 
 export async function getAdminSummary(): Promise<AdminSummary> {

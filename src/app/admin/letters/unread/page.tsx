@@ -82,13 +82,15 @@ export default function AdminUnreadLettersPage() {
   return (
     <main className="admin-page">
       <div className="admin-container">
-        <Link href="/admin" className="admin-back">
-          ← 관리자 홈으로
+        <Link href="/admin/letters" className="admin-back">
+          ← 숨편지 관리로
         </Link>
 
-        <h1 className="admin-title">읽지 않은 숨편지</h1>
+        <h1 className="admin-title">보낸 숨편지</h1>
 
-        <p className="admin-lead">아직 열어보지 않은 숨편지를 살펴봅니다.</p>
+        <p className="admin-lead">
+          아직 열어보지 않은 보낸 숨편지를 살펴봅니다.
+        </p>
 
         {state.status === "loading" && (
           <p className="admin-muted">숨편지를 불러오는 중…</p>

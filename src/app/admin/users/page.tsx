@@ -179,10 +179,12 @@ export default function AdminUsersPage() {
           ← 관리자 홈으로
         </Link>
 
-        <h1 className="admin-title">사람 만나기</h1>
+        <h1 className="admin-title">회원</h1>
 
         <p className="admin-lead">
-          숨비와 함께하는 사람들의 현재 모습을 살펴봅니다.
+          함께하는 참여자를 살펴보고,
+          <br />
+          최근 함께하게 된 사람도 확인합니다.
         </p>
 
         {state.status === "ready" && state.members.length > 0 && (
