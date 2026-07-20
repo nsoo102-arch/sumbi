@@ -74,7 +74,7 @@ export default function HomePage() {
           <span className="sumbi-home-menu-text">
             <span className="sumbi-home-menu-title">숨 계획하기</span>
             <span className="sumbi-home-menu-desc">
-              이번 주 나를 숨 쉬게 할 활동을 정해보세요.
+              이번 한 주를 계획해 보세요.
             </span>
           </span>
         </Link>
