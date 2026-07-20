@@ -82,9 +82,9 @@ body {
   color: var(--sumbi-muted);
 }
 
-/* Today: 이번 주 나의 숨비소리 */
+/* Today: 숨비소리 */
 .sumbi-today-title {
-  margin-bottom: 2.25rem;
+  margin-bottom: 1.75rem;
   text-align: center;
   font-size: 1.375rem;
   font-weight: 600;

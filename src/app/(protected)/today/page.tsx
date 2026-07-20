@@ -26,6 +26,7 @@ export default function TodayPage() {
   const [activities, setActivities] = useState<string[]>(
     Array(ACTIVITY_COUNT).fill(""),
   );
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setActivities(toInputFields(getWeeklyActivities()));
@@ -37,24 +38,43 @@ export default function TodayPage() {
     );
   }
 
-  function handleSubmit() {
-    const filled = normalizeActivities(
-      activities.map((activity) => activity.trim()),
-    );
-    saveWeeklyActivities(filled);
-    saveDraftActivity(filled.join("\n"));
-    void syncWeeklyPlanAfterSave(filled);
-    router.push("/home");
+  async function handleSubmit() {
+    if (submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const filled = normalizeActivities(
+        activities.map((activity) => activity.trim()),
+      );
+      saveWeeklyActivities(filled);
+      saveDraftActivity(filled.join("\n"));
+
+      try {
+        await syncWeeklyPlanAfterSave(filled);
+      } catch (syncError) {
+        console.warn("[today] syncWeeklyPlanAfterSave failed", syncError);
+      }
+
+      router.push("/home");
+    } catch (submitError) {
+      console.error("[today] submit failed", submitError);
+      setSubmitting(false);
+    }
   }
 
   return (
     <section className="sumbi-page items-center">
-      <h1 className="sumbi-today-title">나의 숨비소리</h1>
+      <h1 className="sumbi-today-title">숨비소리</h1>
 
       <p className="sumbi-today-desc mb-8">
-        이번 한 주
+        나를 위한,
         <br />
-        나를 위한 활동을 계획해 보세요.
+        나를 숨 쉬게 해주는
+        <br />
+        활동을 계획해 보세요.
       </p>
 
       <div className="sumbi-content mb-14 flex flex-col space-y-4">
@@ -71,7 +91,9 @@ export default function TodayPage() {
       </div>
 
       <div className="flex justify-center">
-        <Button onClick={handleSubmit}>저장</Button>
+        <Button onClick={handleSubmit} disabled={submitting}>
+          숨 저장
+        </Button>
       </div>
     </section>
   );
