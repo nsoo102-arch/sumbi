@@ -187,7 +187,7 @@ export default function FootprintsPage() {
   }
 
   function handleSubmit() {
-    router.push("/saved");
+    router.push("/home");
   }
 
   const unreadLetters =
@@ -201,7 +201,7 @@ export default function FootprintsPage() {
 
   return (
     <section className="sumbi-page-scroll items-center">
-      <h1 className="sumbi-heading-form">이번 주 나의 숨</h1>
+      <h1 className="sumbi-heading-form">숨 기록</h1>
 
       <div className="sumbi-content mb-14 space-y-10">
         {lettersState.status === "loading" && (
@@ -339,21 +339,10 @@ export default function FootprintsPage() {
             )}
           </Card>
         </div>
-
-        <div>
-          <h2 className="sumbi-subheading">다음 주에 이어갈 숨</h2>
-          <Card compact>
-            <p className="sumbi-body text-center font-light leading-relaxed">
-              이번 주의 숨을 보고,
-              <br />
-              다음 주 숨비소리를 다시 정해보세요.
-            </p>
-          </Card>
-        </div>
       </div>
 
       <div className="flex justify-center">
-        <Button onClick={handleSubmit}>마무리하기</Button>
+        <Button onClick={handleSubmit}>숨 완료</Button>
       </div>
     </section>
   );
