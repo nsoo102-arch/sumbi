@@ -105,9 +105,9 @@ export default function RecordPage() {
         </ul>
       )}
 
-      <h2 className="sumbi-subheading sumbi-content">숨 기록하기</h2>
+      <h2 className="sumbi-heading-tight">숨 기록하기</h2>
 
-      <p className="sumbi-body sumbi-content mb-10">
+      <p className="sumbi-body mb-10">
         오늘 하루 기억하고 싶은 순간이나
         <br />
         마음이 있다면 남겨보세요.
