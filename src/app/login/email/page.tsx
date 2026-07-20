@@ -26,7 +26,7 @@ export default function EmailLoginPage() {
       return;
     }
 
-    router.push("/today");
+    router.push("/home");
   }
 
   return (

@@ -293,6 +293,121 @@ body {
   border-color: color-mix(in srgb, var(--sumbi-primary) 40%, transparent);
 }
 
+/* ——— Home menu ——— */
+.sumbi-home-menu-card-wrap {
+  width: 100%;
+}
+
+.sumbi-home-menu-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--sumbi-border);
+  border-radius: var(--sumbi-radius);
+  background: #fff;
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.sumbi-home-menu-card:hover {
+  border-color: color-mix(in srgb, var(--sumbi-primary) 40%, transparent);
+  box-shadow: 0 4px 14px rgba(46, 125, 122, 0.08);
+}
+
+.sumbi-home-menu-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sumbi-primary) 40%, transparent);
+}
+
+.sumbi-home-menu-emoji {
+  flex-shrink: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.sumbi-home-menu-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sumbi-home-menu-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--sumbi-text);
+}
+
+.sumbi-home-menu-desc {
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--sumbi-text) 55%, transparent);
+}
+
+.sumbi-home-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sumbi-primary) 12%, #fff);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--sumbi-primary);
+}
+
+.sumbi-home-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  border: 1px solid var(--sumbi-border);
+  border-radius: var(--sumbi-radius);
+  background: var(--sumbi-surface);
+  padding: 0.5rem;
+}
+
+.sumbi-home-settings-link {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: calc(var(--sumbi-radius) - 8px);
+  background: transparent;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.9375rem;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: var(--sumbi-text);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sumbi-home-settings-link:hover {
+  background: #fff;
+}
+
+.sumbi-home-settings-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sumbi-primary) 40%, transparent);
+}
+
+.sumbi-home-settings-logout {
+  color: var(--sumbi-error);
+}
+
 /* ——— Admin ——— */
 .admin-page {
   min-height: 100dvh;

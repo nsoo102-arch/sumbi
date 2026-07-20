@@ -8,7 +8,7 @@ export function StartButton() {
   const [href, setHref] = useState("/login/signup");
 
   useEffect(() => {
-    setHref(isAuthenticated() ? "/today" : "/login/signup");
+    setHref(isAuthenticated() ? "/home" : "/login/signup");
   }, []);
 
   return (

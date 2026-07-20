@@ -33,7 +33,7 @@ export default function ProfilePage() {
       name: trimmedName,
       note: existing.profile?.note ?? "",
     });
-    router.push("/today");
+    router.push("/home");
   }
 
   return (

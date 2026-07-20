@@ -59,7 +59,7 @@ export default function SignupPage() {
         console.log("SIGNUP OK", session.email);
       }
 
-      router.replace("/today");
+      router.replace("/home");
     } catch (error) {
       console.error("[signup] unexpected error", error);
       setError("회원가입 처리 중 오류가 발생했습니다.");

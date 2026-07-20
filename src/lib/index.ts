@@ -11,6 +11,8 @@ export {
 } from "./auth";
 export { getFootprintsSummary } from "./footprints";
 export type { FootprintsSummary } from "./footprints";
+export { getPracticeRates } from "./practiceRates";
+export type { PracticeRates } from "./practiceRates";
 export { getWeekKey, getWeekStart, isCurrentWeek } from "./week";
 export {
   commitRecord,
