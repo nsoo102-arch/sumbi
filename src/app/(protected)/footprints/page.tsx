@@ -4,8 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, Card } from "@/components";
 import { getSession } from "@/lib/auth";
-import { getFootprintsSummary, loadSumbi, normalizeActivities } from "@/lib";
-import type { FootprintsSummary } from "@/lib";
+import {
+  getFootprintsSummary,
+  getPracticeRates,
+  loadSumbi,
+  normalizeActivities,
+} from "@/lib";
+import type { FootprintsSummary, PracticeRates } from "@/lib";
 import type { SumbiLetter, SumbiRecord } from "@/types";
 
 type LettersState =
@@ -55,6 +60,11 @@ export default function FootprintsPage() {
   const [summary, setSummary] = useState<FootprintsSummary>({
     weekCounts: [],
   });
+  const [rates, setRates] = useState<PracticeRates>({
+    hasBreathedToday: false,
+    weekRate: 0,
+    monthRate: 0,
+  });
   const [lettersState, setLettersState] = useState<LettersState>({
     status: "loading",
   });
@@ -68,6 +78,7 @@ export default function FootprintsPage() {
       normalizeActivities(todayRecord?.checkedActivities ?? []),
     );
     setSummary(getFootprintsSummary(data.records));
+    setRates(getPracticeRates(data.records));
   }, []);
 
   useEffect(() => {
@@ -337,6 +348,21 @@ export default function FootprintsPage() {
             ) : (
               <p className="sumbi-loading">이번 주 쌓인 숨이 아직 없습니다.</p>
             )}
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Card compact className="text-center">
+            <p className="sumbi-caption mb-2">이번 주 실천률</p>
+            <p className="text-[1.5rem] font-normal tracking-[0.04em] text-sumbi-primary">
+              {rates.weekRate}%
+            </p>
+          </Card>
+          <Card compact className="text-center">
+            <p className="sumbi-caption mb-2">이번 달 실천률</p>
+            <p className="text-[1.5rem] font-normal tracking-[0.04em] text-sumbi-primary">
+              {rates.monthRate}%
+            </p>
           </Card>
         </div>
       </div>
